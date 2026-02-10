@@ -1,20 +1,29 @@
-import { describe, expect, it } from "bun:test";
+import { describe, expect, it, beforeAll } from "bun:test";
 import { Elysia } from 'elysia';
 import { db } from "../src/db";
 import { tickets } from "../src/schema";
-
-// Define the shape of our response to satisfy TypeScript
-interface TicketResponse {
-  id: number;
-  event_name: string;
-  user_id: number;
-  price: number;
-}
+import { sql } from "drizzle-orm";
 
 describe("Booking API Integration", () => {
+  // Test 1: Verify Database Connection is actually alive
+  beforeAll(async () => {
+    try {
+      await db.execute(sql`SELECT 1`);
+      console.log("✅ Database connection verified for testing.");
+    } catch (error) {
+      console.error("❌ Database connection failed in test setup:", error);
+      throw error; // Crash early with a clear message
+    }
+  });
+
   const app = new Elysia()
     .post('/tickets', async ({ body }: any) => {
-        const result = await db.insert(tickets).values(body).returning();
+        // Ensure we map the camelCase from body to snake_case for DB if necessary
+        const result = await db.insert(tickets).values({
+          eventName: body.eventName,
+          userId: body.userId,
+          price: body.price
+        }).returning();
         return result[0];
     });
 
@@ -29,11 +38,11 @@ describe("Booking API Integration", () => {
       })
     );
 
-    // Cast the json to our interface
-    const data = (await response.json()) as TicketResponse;
+    const data = (await response.json()) as { eventName: string; id: number };
     
     expect(response.status).toBe(200);
-    expect(data.event_name).toBe("Tech Conf 2026");
+    // Matching the schema field names
+    expect(data.eventName).toBe("Tech Conf 2026");
     expect(data).toHaveProperty("id");
   });
 });
