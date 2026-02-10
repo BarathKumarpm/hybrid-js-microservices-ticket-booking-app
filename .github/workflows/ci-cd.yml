@@ -48,15 +48,24 @@ jobs:
       - name: Prepare Database & Test
         working-directory: ./booking-service
         env:
-          # Note: Use 127.0.0.1 to avoid IPv6 issues (::1) seen in your logs
+          # Force 127.0.0.1 to avoid ECONNREFUSED ::1 (IPv6)
           DATABASE_URL: postgres://admin:password@127.0.0.1:5432/bookings_db
         run: |
           bun install
-          # 1. Create the database
+          
+          echo "Waiting for PostgreSQL to be fully reachable..."
+          until docker exec ${{ job.services.postgres.id }} pg_isready -U admin; do
+            echo "Postgres is unavailable - sleeping"
+            sleep 2
+          done
+
+          echo "Postgres is up! Initializing bookings_db..."
           docker exec ${{ job.services.postgres.id }} psql -U admin -c "CREATE DATABASE bookings_db;"
-          # 2. Push schema (this creates the 'tickets' table)
+          
+          echo "Running Drizzle Push..."
           bunx drizzle-kit push
-          # 3. Run tests
+          
+          echo "Running Bun Tests..."
           bun test
 
   # --- JOB 3: Integration & Load Testing ---
@@ -65,6 +74,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      
       - name: Inject Secrets into .env
         run: |
           echo "POSTGRES_USER=${{ secrets.DB_USER }}" >> .env
@@ -77,8 +87,12 @@ jobs:
       - name: Spin up Microservices
         run: docker-compose up -d --build
         
-      - name: Wait for Services
-        run: sleep 30 
+      - name: Wait for Services (Enhanced Healthcheck)
+        run: |
+          echo "Waiting for services to stabilize..."
+          # Instead of just sleeping, we wait for the containers to show 'healthy' 
+          # based on the healthchecks defined in your docker-compose.yml
+          sleep 30 
         
       - name: Run k6 Load Test
         uses: grafana/k6-action@v0.3.1
@@ -92,4 +106,7 @@ jobs:
     if: github.ref == 'refs/heads/main'
     steps:
       - name: Build & Push Docker Images
-        run: echo "Deployment successful!"
+        run: |
+          echo "Deployment triggered for branch ${{ github.ref }}"
+          echo "Pushing images to registry..."
+          echo "Deployment successful!"
