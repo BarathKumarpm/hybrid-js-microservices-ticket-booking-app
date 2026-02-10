@@ -48,18 +48,18 @@ jobs:
       - name: Prepare Database & Test
         working-directory: ./booking-service
         env:
-          # We pass DATABASE_URL here so the code doesn't have to build it in CI
+          # Use 127.0.0.1 to avoid IPv6 (::1) ECONNREFUSED issues
           DATABASE_URL: postgres://${{ secrets.DB_USER }}:${{ secrets.DB_PASSWORD }}@127.0.0.1:5432/bookings_db
         run: |
           bun install
           
-          echo "Waiting for PostgreSQL to be active..."
+          echo "Waiting for PostgreSQL port to be active..."
           for i in {1..10}; do
             docker exec ${{ job.services.postgres.id }} pg_isready -U ${{ secrets.DB_USER }} && break || sleep 2
           done
 
           echo "Initializing logical database..."
-          # Connect to default 'postgres' db to create the 'bookings_db'
+          # Connect to 'postgres' default DB to create 'bookings_db'
           docker exec ${{ job.services.postgres.id }} psql -U ${{ secrets.DB_USER }} -d postgres -c "CREATE DATABASE bookings_db;"
           
           echo "Syncing Schema..."
@@ -74,6 +74,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      
       - name: Inject Secrets into .env
         run: |
           echo "POSTGRES_USER=${{ secrets.DB_USER }}" >> .env
@@ -84,7 +85,8 @@ jobs:
           echo "INTERNAL_BOOKING_DB_URL=${{ secrets.INTERNAL_BOOKING_DB_URL }}" >> .env
 
       - name: Spin up Microservices
-        run: docker-compose up -d --build
+        # FIX: Use 'docker compose' (V2) instead of the deprecated 'docker-compose'
+        run: docker compose up -d --build
         
       - name: Wait for Services
         run: sleep 30 
@@ -93,6 +95,10 @@ jobs:
         uses: grafana/k6-action@v0.3.1
         with:
           filename: load-test.js
+          
+      - name: Cleanup Containers
+        if: always()
+        run: docker compose down
 
   # --- JOB 4: Deployment ---
   deploy:
