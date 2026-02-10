@@ -1,9 +1,14 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Client } from 'pg';
 
-// process.env.DATABASE_URL is injected by Docker or .env
+const connectionString = process.env.DATABASE_URL || process.env.INTERNAL_BOOKING_DB_URL;
+
+if (!connectionString) {
+  throw new Error("DATABASE_URL is not defined in environment variables");
+}
+
 const client = new Client({
-  connectionString: process.env.DATABASE_URL
+  connectionString: connectionString
 });
 
 await client.connect();
