@@ -29,8 +29,8 @@ jobs:
       postgres:
         image: postgres:15-alpine
         env:
-          POSTGRES_USER: admin
-          POSTGRES_PASSWORD: password
+          POSTGRES_USER: ${{ secrets.DB_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.DB_PASSWORD }}
           POSTGRES_DB: postgres 
         ports:
           - 5432:5432
@@ -48,26 +48,26 @@ jobs:
       - name: Prepare Database & Test
         working-directory: ./booking-service
         env:
-          # Force 127.0.0.1 to avoid ECONNREFUSED ::1 (IPv6)
-          DATABASE_URL: postgres://admin:password@127.0.0.1:5432/bookings_db
+          # Force 127.0.0.1 to avoid the IPv6 (::1) error seen in your logs
+          DATABASE_URL: postgres://${{ secrets.DB_USER }}:${{ secrets.DB_PASSWORD }}@127.0.0.1:5432/bookings_db
         run: |
           bun install
           
-          echo "Waiting for PostgreSQL to be fully reachable..."
-          until docker exec ${{ job.services.postgres.id }} pg_isready -U admin; do
-            echo "Postgres is unavailable - sleeping"
-            sleep 2
+          echo "Waiting for PostgreSQL port to be active..."
+          # Active polling to ensure we don't hit ECONNREFUSED
+          for i in {1..10}; do
+            docker exec ${{ job.services.postgres.id }} pg_isready -U ${{ secrets.DB_USER }} && break || sleep 2
           done
 
-          echo "Postgres is up! Initializing bookings_db..."
-          docker exec ${{ job.services.postgres.id }} psql -U admin -c "CREATE DATABASE bookings_db;"
+          echo "Initializing logical database..."
+          docker exec ${{ job.services.postgres.id }} psql -U ${{ secrets.DB_USER }} -c "CREATE DATABASE bookings_db;"
           
-          echo "Running Drizzle Push..."
+          echo "Syncing Schema..."
           bunx drizzle-kit push
           
-          echo "Running Bun Tests..."
+          echo "Executing Bun Tests..."
           bun test
-
+          
   # --- JOB 3: Integration & Load Testing ---
   load-test:
     needs: [test-user-service, test-booking-service]
