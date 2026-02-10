@@ -31,7 +31,7 @@ jobs:
         env:
           POSTGRES_USER: admin
           POSTGRES_PASSWORD: password
-          POSTGRES_DB: postgres # Default start DB
+          POSTGRES_DB: postgres 
         ports:
           - 5432:5432
         options: >-
@@ -45,16 +45,16 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@v1
 
-      - name: Install & Migrate & Test
+      - name: Prepare Database & Test
         working-directory: ./booking-service
         env:
-          # We use localhost because the runner is on the same network as the service
-          DATABASE_URL: postgres://admin:password@localhost:5432/bookings_db
+          # Note: Use 127.0.0.1 to avoid IPv6 issues (::1) seen in your logs
+          DATABASE_URL: postgres://admin:password@127.0.0.1:5432/bookings_db
         run: |
           bun install
-          # 1. Create the specific logical database
+          # 1. Create the database
           docker exec ${{ job.services.postgres.id }} psql -U admin -c "CREATE DATABASE bookings_db;"
-          # 2. Push schema to create the 'tickets' table
+          # 2. Push schema (this creates the 'tickets' table)
           bunx drizzle-kit push
           # 3. Run tests
           bun test
