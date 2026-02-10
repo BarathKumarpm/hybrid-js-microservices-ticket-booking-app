@@ -1,16 +1,33 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Client } from 'pg';
 
-// Use a fallback to 127.0.0.1 if the env var isn't fully propagated in some shells
-const connectionString = process.env.DATABASE_URL || `postgres://admin:password@127.0.0.1:5432/bookings_db`;
+// 1. Try to get a pre-built URL
+let connectionString = process.env.DATABASE_URL;
+
+// 2. If not found, build it from your individual variables
+if (!connectionString) {
+  const user = process.env.DB_USER;
+  const password = process.env.DB_PASSWORD;
+  const host = process.env.DB_HOST || 'localhost';
+  const port = process.env.DB_PORT || '5432';
+  const dbName = process.env.DB_NAME_BOOKINGS;
+
+  if (user && password && dbName) {
+    connectionString = `postgres://${user}:${password}@${host}:${port}/${dbName}`;
+  }
+}
+
+// 3. Final safety check
+if (!connectionString) {
+  console.error("🔴 Connection failed: No database credentials found in environment.");
+  process.exit(1);
+}
 
 const client = new Client({
   connectionString: connectionString,
-  // Add a small connection timeout
   connectionTimeoutMillis: 5000, 
 });
 
-// Explicitly handle the connection error to avoid "Unhandled Error"
 try {
   await client.connect();
   console.log("🟢 DB Connected successfully");

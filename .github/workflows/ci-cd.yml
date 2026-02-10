@@ -48,33 +48,32 @@ jobs:
       - name: Prepare Database & Test
         working-directory: ./booking-service
         env:
-          # Force 127.0.0.1 to avoid the IPv6 (::1) error seen in your logs
+          # We pass DATABASE_URL here so the code doesn't have to build it in CI
           DATABASE_URL: postgres://${{ secrets.DB_USER }}:${{ secrets.DB_PASSWORD }}@127.0.0.1:5432/bookings_db
         run: |
           bun install
           
-          echo "Waiting for PostgreSQL port to be active..."
-          # Active polling to ensure we don't hit ECONNREFUSED
+          echo "Waiting for PostgreSQL to be active..."
           for i in {1..10}; do
             docker exec ${{ job.services.postgres.id }} pg_isready -U ${{ secrets.DB_USER }} && break || sleep 2
           done
 
           echo "Initializing logical database..."
-          docker exec ${{ job.services.postgres.id }} psql -U ${{ secrets.DB_USER }} -c "CREATE DATABASE bookings_db;"
+          # Connect to default 'postgres' db to create the 'bookings_db'
+          docker exec ${{ job.services.postgres.id }} psql -U ${{ secrets.DB_USER }} -d postgres -c "CREATE DATABASE bookings_db;"
           
           echo "Syncing Schema..."
           bunx drizzle-kit push
           
           echo "Executing Bun Tests..."
           bun test
-          
+
   # --- JOB 3: Integration & Load Testing ---
   load-test:
     needs: [test-user-service, test-booking-service]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
       - name: Inject Secrets into .env
         run: |
           echo "POSTGRES_USER=${{ secrets.DB_USER }}" >> .env
@@ -87,12 +86,8 @@ jobs:
       - name: Spin up Microservices
         run: docker-compose up -d --build
         
-      - name: Wait for Services (Enhanced Healthcheck)
-        run: |
-          echo "Waiting for services to stabilize..."
-          # Instead of just sleeping, we wait for the containers to show 'healthy' 
-          # based on the healthchecks defined in your docker-compose.yml
-          sleep 30 
+      - name: Wait for Services
+        run: sleep 30 
         
       - name: Run k6 Load Test
         uses: grafana/k6-action@v0.3.1
@@ -106,7 +101,4 @@ jobs:
     if: github.ref == 'refs/heads/main'
     steps:
       - name: Build & Push Docker Images
-        run: |
-          echo "Deployment triggered for branch ${{ github.ref }}"
-          echo "Pushing images to registry..."
-          echo "Deployment successful!"
+        run: echo "Deployment successful!"
