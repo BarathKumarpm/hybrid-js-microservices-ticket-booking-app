@@ -1,0 +1,68 @@
+name: Hybrid Architecture Js Microservices CI-CD Pipeline
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  # --- JOB 1: Test User Service (NestJS) ---
+  test-user-service:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install & Test NestJS
+        working-directory: ./user-service
+        run: |
+          npm install
+          npm test
+
+  # --- JOB 2: Test Booking Service (Bun) ---
+  test-booking-service:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+      - name: Install & Test Elysia
+        working-directory: ./booking-service
+        run: |
+          bun install
+          bun test
+
+  # --- JOB 3: Integration & Load Testing (The Core) ---
+  # This runs only if both previous jobs pass
+  load-test:
+    needs: [test-user-service, test-booking-service]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Spin up Microservices (Docker Compose)
+        run: docker-compose up -d --build
+        
+      - name: Wait for Services to be Healthy
+        run: sleep 20 # Give Postgres and NestJS time to start
+        
+      - name: Run k6 Load Test
+        uses: grafana/k6-action@v0.3.1
+        with:
+          filename: load-test.js
+
+  # --- JOB 4: Deployment (Simulated) ---
+  deploy:
+    needs: [load-test]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' # Only deploy on pushes to main
+    steps:
+      - name: Build & Push Docker Images
+        run: |
+          echo "Logging into Docker Registry..."
+          echo "Building user-service:latest..."
+          echo "Building booking-service:latest..."
+          echo "Deployment successful!"

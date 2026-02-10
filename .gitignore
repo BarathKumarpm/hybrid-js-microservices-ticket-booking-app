@@ -1,0 +1,84 @@
+# ==========================================
+# 1. CRITICAL SECRETS & ENCAPSULATED KEYS
+# ==========================================
+# This protects your root .env and all sub-folder .env files
+.env
+.env.local
+**/.env
+**/.env.local
+**/.env.development.local
+**/.env.test.local
+**/.env.production.local
+**/.env.sample
+
+# Ignore Drizzle migration metadata and snapshots
+**/drizzle/
+
+# ==========================================
+# 2. DEPENDENCIES & COMPILED OUTPUT
+# ==========================================
+# Node.js and Bun dependencies
+**/node_modules/
+.bun/
+bun.lockb
+
+# Build outputs
+**/dist/
+**/build/
+**/out/
+*.tgz
+.temp
+.tmp
+*.tsbuildinfo
+
+# ==========================================
+# 3. DATABASE & DOCKER RUNTIME
+# ==========================================
+# Ignore the actual raw data stored by Postgres on your disk
+pgdata/
+postgres_data/
+
+# Logs and PID files
+**/logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# ==========================================
+# 4. TESTING & COVERAGE
+# ==========================================
+**/coverage/
+.nyc_output
+*.lcov
+# k6 test results
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# ==========================================
+# 5. SYSTEM & IDEs
+# ==========================================
+# OS specific
+.DS_Store
+Thumbs.db
+
+# JetBrains (IntelliJ, WebStorm)
+.idea/
+
+# VS Code - Ignore personal state but keep shared config
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# Other editors
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace

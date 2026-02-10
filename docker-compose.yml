@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: ticket_db
+    ports:
+      - "${DB_PORT}:5432"
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - ./init-db:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ticket-net
+
+  user-service:
+    build: ./user-service
+    container_name: nest_user_service
+    ports:
+      - "3000:3000"
+    environment:
+      DB_HOST: postgres # Internal Docker DNS
+      DB_USER: ${DB_USER}
+      DB_PASS: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME_USERS}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - ticket-net
+
+  booking-service:
+    build: ./booking-service
+    container_name: bun_booking_service
+    ports:
+      - "3001:3001"
+    environment:
+      DATABASE_URL: ${INTERNAL_BOOKING_DB_URL}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: sh -c "bunx drizzle-kit push && bun src/index.ts"
+    networks:
+      - ticket-net
+
+networks:
+  ticket-net:
+    driver: bridge
